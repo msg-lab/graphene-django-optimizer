@@ -211,8 +211,7 @@ class QueryOptimizer(object):
             field_store = QueryOptimizerStore(
                 disable_abort_only=self.disable_abort_only,
             )
-            related_queryset = model_field.related_model.objects.all()
-            store.prefetch_related(name, field_store, related_queryset)
+            store.prefetch_related(name, field_store, None)
             return True
         if not model_field.is_relation:
             store.only(name)
