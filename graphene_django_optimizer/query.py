@@ -1,5 +1,6 @@
 import functools
 
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.core.exceptions import FieldDoesNotExist
 from django.db.models import ForeignKey, Prefetch
 from django.db.models.constants import LOOKUP_SEP
@@ -185,7 +186,7 @@ class QueryOptimizer(object):
         if self._is_foreign_key_id(model_field, name):
             store.only(name)
             return True
-        if model_field.many_to_one or model_field.one_to_one:
+        if not isinstance(model_field, GenericForeignKey) and (model_field.many_to_one or model_field.one_to_one):
             field_store = self._optimize_gql_selections(
                 self._get_type(field_def),
                 selection,
@@ -203,6 +204,13 @@ class QueryOptimizer(object):
             if isinstance(model_field, ManyToOneRel):
                 field_store.only(model_field.field.name)
 
+            related_queryset = model_field.related_model.objects.all()
+            store.prefetch_related(name, field_store, related_queryset)
+            return True
+        if isinstance(model_field, GenericForeignKey):
+            field_store = QueryOptimizerStore(
+                disable_abort_only=self.disable_abort_only,
+            )
             related_queryset = model_field.related_model.objects.all()
             store.prefetch_related(name, field_store, related_queryset)
             return True
