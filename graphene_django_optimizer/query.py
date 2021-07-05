@@ -338,10 +338,16 @@ class QueryOptimizer(object):
 
 
 class QueryOptimizerStore:
-    def __init__(self, disable_abort_only=False):
+    def __init__(self, disable_only_optimization=True, disable_abort_only=False):
         self.select_list = []
         self.prefetch_list = []
         self.only_list = []
+
+        # Disable .only(), there's some bug with django_model_utils that causes RecursionError when
+        # .only() is used, not sure MonitorField or FieldTracker is the culprit
+        self.disable_only_optimization = disable_only_optimization
+        if disable_only_optimization:
+            self.only_list = None
         self.disable_abort_only = disable_abort_only
 
     def select_related(self, name, store):
@@ -356,7 +362,7 @@ class QueryOptimizerStore:
             else:
                 prefetch = name + LOOKUP_SEP + prefetch
             self.prefetch_list.append(prefetch)
-        if self.only_list is not None:
+        if self.only_list is not None and not self.disable_only_optimization:
             if store.only_list is None:
                 self.abort_only_optimization()
             else:
@@ -378,7 +384,7 @@ class QueryOptimizerStore:
             self.prefetch_list.append(name)
 
     def only(self, field):
-        if self.only_list is not None:
+        if self.only_list is not None and not self.disable_only_optimization:
             self.only_list.append(field)
 
     def abort_only_optimization(self):
@@ -392,7 +398,7 @@ class QueryOptimizerStore:
         if self.prefetch_list:
             queryset = queryset.prefetch_related(*self.prefetch_list)
 
-        if self.only_list:
+        if self.only_list and not self.disable_only_optimization:
             queryset = queryset.only(*self.only_list)
 
         return queryset
@@ -400,7 +406,7 @@ class QueryOptimizerStore:
     def append(self, store):
         self.select_list += store.select_list
         self.prefetch_list += store.prefetch_list
-        if self.only_list is not None:
+        if self.only_list is not None and not self.disable_only_optimization:
             if store.only_list is None:
                 self.only_list = None
             else:
